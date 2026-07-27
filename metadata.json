@@ -1,0 +1,6 @@
+{
+  "name": "Seerah Quest",
+  "description": "An interactive AI-powered Islamic educational platform for studying the Life of Prophet Muhammad ﷺ with authentic Seerah literature, digital reader, gamified quizzes, interactive timeline, live study sessions, and Groq-powered AI assistant.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
