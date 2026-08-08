@@ -75,7 +75,7 @@ app.post('/api/chat', async (req, res) => {
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
-            res.write(`data: ${JSON.stringify({ text: content, modelUsed: `Groq (${targetModel})` })}\n\n`);
+            res.write(`data: ${JSON.stringify({ text: content, modelUsed: 'Seerah AI Scholar' })}\n\n`);
           }
         }
         res.write('data: [DONE]\n\n');
@@ -130,8 +130,6 @@ The life of Prophet Muhammad ﷺ serves as a comprehensive light (*Siraj munit*)
 - **Ar-Raheeq Al-Makhtum (The Sealed Nectar)** by Sheikh Safi-ur-Rahman Mubarakpuri
 - **Fiqh-us-Seerah** by Sheikh Muhammad al-Ghazali
 - **Sirat Ibn Hisham** (Primary Classical Record)
-
-*Tip: To activate dynamic AI generation with Llama 3.3 70B, Mixtral, or DeepSeek R1, configure your \`GROQ_API_KEY\` in the Secrets menu.*
 `;
 
     if (lastMsg.includes('badr') || lastMsg.includes('battle')) {

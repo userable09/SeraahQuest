@@ -38,7 +38,7 @@ export const HeroLanding: React.FC<HeroLandingProps> = ({ onNavigate, userProgre
         <div className="relative z-10 max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Powered by GROQ Llama 3.3 70B & Authentic Seerah Literature</span>
+            <span>Powered by Advanced Seerah AI & Authentic Literature</span>
           </div>
 
           <div className="space-y-2">
@@ -156,8 +156,8 @@ export const HeroLanding: React.FC<HeroLandingProps> = ({ onNavigate, userProgre
                 <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">
                   AI Seerah Assistant
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  GROQ Llama
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  AI Powered
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-2 leading-relaxed">

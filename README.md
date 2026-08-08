@@ -7,10 +7,6 @@
 Seerah Quest Scholar is a next-generation Islamic educational platform. It bridges classical scholarship with modern interactive learning paradigms to create a rich, engaging, and deeply personal study experience. Whether you are a casual learner or a dedicated student, this platform provides the tools to explore the life of the Prophet ﷺ like never before.
 
 ---
-## Live App
-**Link** : https://seraah-quest.vercel.app/
-
----
 
 ## 📸 Platform Showcase
 

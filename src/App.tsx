@@ -15,6 +15,7 @@ import { TimelineView } from './components/TimelineView';
 import { HalaqahView } from './components/HalaqahView';
 import { ReflectionView } from './components/ReflectionView';
 import { SearchModal } from './components/SearchModal';
+import { Footer } from './components/Footer';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('home');
@@ -146,19 +147,7 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer className="border-t border-white/10 bg-slate-950/80 backdrop-blur-xl py-8 text-center text-xs text-slate-400 relative z-10">
-        <div className="max-w-7xl mx-auto px-4 space-y-3">
-          <p className="font-arabic text-emerald-400 text-sm font-medium">
-            اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ
-          </p>
-          <p>
-            <strong className="text-white">Seerah Quest</strong> — An AI-powered Islamic educational platform for studying the Life of Prophet Muhammad ﷺ.
-          </p>
-          <p className="text-[11px] text-slate-500">
-            Content sourced from classical biographies (*Ar-Raheeq Al-Makhtum*, *Sirat Ibn Hisham*) and verified Hadith references.
-          </p>
-        </div>
-      </footer>
+      <Footer />
 
     </div>
   );

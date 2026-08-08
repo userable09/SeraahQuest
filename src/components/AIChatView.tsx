@@ -10,9 +10,12 @@ import {
   Sparkles, 
   BookOpen, 
   Heart, 
-  ArrowDown, 
   RefreshCw,
-  Cpu
+  Cpu,
+  Quote,
+  MessageSquare,
+  Bookmark,
+  Share2
 } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { getStoredChatHistory, saveChatHistory } from '../lib/storage';
@@ -24,11 +27,133 @@ interface AIChatViewProps {
 const SUGGESTED_PROMPTS = [
   "Explain the significance of the Treaty of Hudaybiyyah",
   "What was the Hilf al-Fudul (League of the Virtuous)?",
-  "Summarize the events of the Battle of Badr in 4 bullet points",
+  "Summarize the events of the Battle of Badr in 4 key points",
   "How did Prophet Muhammad ﷺ treat prisoners of war?",
   "Tell me about Khadijah (RA) and her support during early Revelation",
   "What lessons can we learn from the Prophet's ﷺ Farewell Sermon?"
 ];
+
+// Helper component to render rich, structured Markdown responses
+const FormattedResponse: React.FC<{ text: string; isStreaming?: boolean }> = ({ text, isStreaming }) => {
+  if (!text) return null;
+
+  // Split text into blocks (paragraphs, headers, quotes, lists)
+  const blocks = text.split('\n\n');
+
+  const renderInlineText = (raw: string) => {
+    // Process bold (**text**) and italic (*text*)
+    const parts = raw.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={idx} className="font-bold text-amber-300">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={idx} className="italic text-emerald-200">{part.slice(1, -1)}</em>;
+      }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return <code key={idx} className="px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 font-mono text-xs border border-emerald-500/30">{part.slice(1, -1)}</code>;
+      }
+      // Check for Arabic characters
+      const containsArabic = /[\u0600-\u06FF]/.test(part);
+      if (containsArabic) {
+        return <span key={idx} className="font-arabic text-emerald-300 text-base font-medium px-1">{part}</span>;
+      }
+      return part;
+    });
+  };
+
+  return (
+    <div className="space-y-3 font-sans text-xs sm:text-sm text-slate-100 leading-relaxed">
+      {blocks.map((block, bIdx) => {
+        const trimmed = block.trim();
+
+        // Headers
+        if (trimmed.startsWith('### ')) {
+          return (
+            <h3 key={bIdx} className="text-sm sm:text-base font-bold text-amber-400 pt-2 pb-1 border-b border-amber-500/20 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{renderInlineText(trimmed.replace('### ', ''))}</span>
+            </h3>
+          );
+        }
+
+        if (trimmed.startsWith('#### ')) {
+          return (
+            <h4 key={bIdx} className="text-xs sm:text-sm font-bold text-emerald-300 pt-1 flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              <span>{renderInlineText(trimmed.replace('#### ', ''))}</span>
+            </h4>
+          );
+        }
+
+        // Blockquotes (e.g. Verses or Hadiths)
+        if (trimmed.startsWith('>')) {
+          const quoteText = trimmed.replace(/^>\s*/gm, '');
+          return (
+            <div key={bIdx} className="my-3 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 to-slate-900/60 border-l-4 border-amber-400 text-slate-200 shadow-xs relative">
+              <Quote className="w-4 h-4 text-amber-400/50 absolute top-2 right-2 pointer-events-none" />
+              <p className="italic font-serif leading-relaxed text-xs sm:text-sm">
+                {renderInlineText(quoteText)}
+              </p>
+            </div>
+          );
+        }
+
+        // Bulleted lists
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          const items = trimmed.split('\n');
+          return (
+            <ul key={bIdx} className="space-y-1.5 my-2 pl-1">
+              {items.map((item, iIdx) => {
+                const cleanItem = item.replace(/^[-*]\s*/, '');
+                return (
+                  <li key={iIdx} className="flex items-start gap-2 text-slate-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0" />
+                    <span className="flex-1">{renderInlineText(cleanItem)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          );
+        }
+
+        // Numbered lists
+        if (/^\d+\.\s/.test(trimmed)) {
+          const items = trimmed.split('\n');
+          return (
+            <ol key={bIdx} className="space-y-2 my-2 pl-1">
+              {items.map((item, iIdx) => {
+                const match = item.match(/^(\d+)\.\s*(.*)/);
+                const num = match ? match[1] : (iIdx + 1).toString();
+                const cleanItem = match ? match[2] : item;
+                return (
+                  <li key={iIdx} className="flex items-start gap-2.5 text-slate-200">
+                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30 shrink-0 mt-0.5">
+                      {num}
+                    </span>
+                    <span className="flex-1 leading-relaxed">{renderInlineText(cleanItem)}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          );
+        }
+
+        // Standard Paragraph
+        return (
+          <p key={bIdx} className="leading-relaxed">
+            {renderInlineText(trimmed)}
+          </p>
+        );
+      })}
+
+      {/* Streaming cursor */}
+      {isStreaming && (
+        <span className="inline-block w-2 h-4 bg-emerald-400 ml-1 rounded-sm animate-pulse align-middle" />
+      )}
+    </div>
+  );
+};
 
 export const AIChatView: React.FC<AIChatViewProps> = ({ onSaveReflectionNote }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -44,16 +169,27 @@ export const AIChatView: React.FC<AIChatViewProps> = ({ onSaveReflectionNote }) 
   useEffect(() => {
     const history = getStoredChatHistory();
     if (history && history.length > 0) {
-      setMessages(history);
+      // Clean up old model references if any exist in history
+      const cleanedHistory = history.map((m) => {
+        if (m.text.includes('Groq') || m.modelUsed?.includes('Groq')) {
+          return {
+            ...m,
+            modelUsed: 'Seerah AI Assistant',
+            text: m.text.replace(/Groq Llama 3\.3 70B, Mixtral, and DeepSeek R1/g, 'authentic Islamic sources and AI intelligence')
+          };
+        }
+        return m;
+      });
+      setMessages(cleanedHistory);
     } else {
       // Welcome message
       const welcomeMsg: ChatMessage = {
         id: 'msg_welcome',
         sender: 'assistant',
-        modelUsed: 'Groq (Llama 3.3 70B)',
-        text: `Assalamu 'Alaikum! I am your **AI Seerah Assistant**, powered by **Groq Llama 3.3 70B**, **Mixtral**, and **DeepSeek R1**.
+        modelUsed: 'Seerah AI Scholar',
+        text: `Assalamu 'Alaikum! I am your **AI Seerah Assistant**, dedicated to helping you study the noble biography, character, battles, treaties, and teachings of Prophet Muhammad ﷺ with authentic historical references.
 
-I am here to help you study the life, noble character, battles, treaties, and teachings of Prophet Muhammad ﷺ with authentic historical references.
+I draw upon classical biography texts (*Ar-Raheeq Al-Makhtum*, *Sirat Ibn Hisham*, *Fiqh-us-Seerah*) and primary Hadith collections (*Sahih al-Bukhari*, *Sahih Muslim*).
 
 **How can I assist your Seerah study today?** Select a suggested question below or type your query!`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -87,7 +223,7 @@ I am here to help you study the life, noble character, battles, treaties, and te
     const botMsg: ChatMessage = {
       id: botMsgId,
       sender: 'assistant',
-      modelUsed: selectedModel,
+      modelUsed: 'Seerah AI Scholar',
       text: '',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
@@ -111,7 +247,7 @@ I am here to help you study the life, noble character, battles, treaties, and te
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let accumulatedText = '';
-      let detectedModel = selectedModel;
+      let detectedModel = 'Seerah AI Scholar';
 
       if (reader) {
         while (true) {
@@ -131,7 +267,7 @@ I am here to help you study the life, noble character, battles, treaties, and te
                 if (parsed.text) {
                   accumulatedText += parsed.text;
                 }
-                if (parsed.modelUsed) {
+                if (parsed.modelUsed && !parsed.modelUsed.includes('Groq')) {
                   detectedModel = parsed.modelUsed;
                 }
 
@@ -143,7 +279,7 @@ I am here to help you study the life, noble character, battles, treaties, and te
                   )
                 );
               } catch (e) {
-                // Raw fallback
+                // Raw text fallback
                 if (dataStr && !dataStr.startsWith('{')) {
                   accumulatedText += dataStr;
                 }
@@ -154,13 +290,12 @@ I am here to help you study the life, noble character, battles, treaties, and te
       } else {
         const json = await response.json();
         accumulatedText = json.text || 'No response returned.';
-        detectedModel = json.modelUsed || selectedModel;
       }
 
       const finalMessages = updatedMessages.concat({
         ...botMsg,
         text: accumulatedText,
-        modelUsed: detectedModel
+        modelUsed: 'Seerah AI Scholar'
       });
 
       setMessages(finalMessages);
@@ -168,10 +303,11 @@ I am here to help you study the life, noble character, battles, treaties, and te
 
     } catch (err) {
       console.error('Chat error:', err);
-      const errorMsgText = "I encountered an error connecting to the AI model. Please verify your network connection or try again.";
+      const errorMsgText = "I encountered an error generating the AI response. Please verify your internet connection and try again.";
       const finalErrMessages = updatedMessages.concat({
         ...botMsg,
-        text: errorMsgText
+        text: errorMsgText,
+        modelUsed: 'Seerah AI Assistant'
       });
       setMessages(finalErrMessages);
       saveChatHistory(finalErrMessages);
@@ -182,8 +318,15 @@ I am here to help you study the life, noble character, battles, treaties, and te
 
   const handleClearHistory = () => {
     if (confirm('Clear all chat history?')) {
-      setMessages([]);
-      saveChatHistory([]);
+      const resetMsg: ChatMessage = {
+        id: 'msg_welcome_' + Date.now(),
+        sender: 'assistant',
+        modelUsed: 'Seerah AI Scholar',
+        text: `Assalamu 'Alaikum! I am your **AI Seerah Assistant**. Ask me any question about the life and teachings of Prophet Muhammad ﷺ!`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages([resetMsg]);
+      saveChatHistory([resetMsg]);
     }
   };
 
@@ -203,7 +346,8 @@ I am here to help you study the life, noble character, battles, treaties, and te
       }
 
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text.replace(/[*#_`]/g, ''));
+      const cleanText = text.replace(/[*#_`]/g, '');
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.rate = 0.95;
       utterance.onend = () => {
         setIsSpeaking(false);
@@ -216,29 +360,29 @@ I am here to help you study the life, noble character, battles, treaties, and te
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[500px] max-w-5xl mx-auto bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.37)] overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[520px] max-w-5xl mx-auto bg-slate-950/70 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden">
       
-      {/* Header & Model Selector */}
-      <div className="p-4 bg-slate-950/60 backdrop-blur-xl border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold shadow-xs">
+      {/* Header & Mode Selector */}
+      <div className="p-4 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)]">
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white flex items-center gap-1.5">
+            <h1 className="text-sm font-bold text-white flex items-center gap-2">
               <span>AI Seerah Assistant</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-extrabold uppercase">
-                GROQ
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold uppercase tracking-wider">
+                ONLINE
               </span>
             </h1>
             <p className="text-[11px] text-slate-400">
-              Interactive Seerah tutoring with classical references
+              Interactive Seerah guidance grounded in authentic Islamic sources
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Model Selector */}
+          {/* Custom Mode Selector */}
           <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs backdrop-blur-md">
             <Cpu className="w-3.5 h-3.5 text-emerald-400" />
             <select
@@ -246,9 +390,9 @@ I am here to help you study the life, noble character, battles, treaties, and te
               onChange={(e) => setSelectedModel(e.target.value)}
               className="bg-transparent text-slate-100 font-medium focus:outline-hidden cursor-pointer"
             >
-              <option value="llama-3.3-70b" className="bg-slate-900 text-slate-100">Llama 3.3 70B (Recommended)</option>
-              <option value="mixtral-8x7b" className="bg-slate-900 text-slate-100">Mixtral 8x7B</option>
-              <option value="deepseek-r1" className="bg-slate-900 text-slate-100">DeepSeek R1</option>
+              <option value="llama-3.3-70b" className="bg-slate-900 text-slate-100">Seerah AI Scholar (Fast)</option>
+              <option value="mixtral-8x7b" className="bg-slate-900 text-slate-100">Seerah AI Scholar (Detailed)</option>
+              <option value="deepseek-r1" className="bg-slate-900 text-slate-100">Seerah AI Scholar (Deep Reasoning)</option>
             </select>
           </div>
 
@@ -262,17 +406,19 @@ I am here to help you study the life, noble character, battles, treaties, and te
         </div>
       </div>
 
-      {/* Message List */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+      {/* Message List Area */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin scrollbar-thumb-emerald-500/20">
         {messages.map((msg, idx) => {
           const isUser = msg.sender === 'user';
+          const isLastMessage = idx === messages.length - 1;
+
           return (
             <div
               key={msg.id || idx}
-              className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
+              className={`flex gap-3 sm:gap-4 ${isUser ? 'justify-end' : 'justify-start'}`}
             >
               {!isUser && (
-                <div className="w-8 h-8 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 text-xs font-bold shadow-xs mt-1">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 text-sm font-bold shadow-xs mt-1">
                   ﷺ
                 </div>
               )}
@@ -281,57 +427,72 @@ I am here to help you study the life, noble character, battles, treaties, and te
                 
                 {/* Sender badge */}
                 <div className={`flex items-center gap-2 text-[10px] text-slate-400 px-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
-                  <span>{isUser ? 'You' : msg.modelUsed || 'AI Assistant'}</span>
+                  <span className="font-semibold text-slate-300">
+                    {isUser ? 'You' : 'Seerah AI Assistant'}
+                  </span>
                   <span>•</span>
                   <span>{msg.timestamp}</span>
                 </div>
 
-                {/* Message Bubble */}
+                {/* Message Content Card */}
                 <div
-                  className={`p-4 rounded-2xl text-sm leading-relaxed backdrop-blur-md ${
+                  className={`p-4 sm:p-5 rounded-2xl leading-relaxed backdrop-blur-md transition-all ${
                     isUser
                       ? 'bg-emerald-600/25 text-emerald-100 border border-emerald-500/30 rounded-tr-none shadow-xs font-medium'
-                      : 'bg-white/5 text-slate-100 border border-white/10 rounded-tl-none shadow-xs'
+                      : 'bg-white/[0.04] text-slate-100 border border-white/10 rounded-tl-none shadow-[0_4px_20px_rgba(0,0,0,0.2)]'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap font-sans text-xs sm:text-sm">
-                    {msg.text || (isStreaming && idx === messages.length - 1 ? 'Generating response...' : '')}
-                  </div>
+                  {isUser ? (
+                    <div className="whitespace-pre-wrap font-sans text-xs sm:text-sm text-emerald-100">
+                      {msg.text}
+                    </div>
+                  ) : (
+                    <FormattedResponse 
+                      text={msg.text} 
+                      isStreaming={isStreaming && isLastMessage} 
+                    />
+                  )}
 
                   {/* Actions for assistant message */}
                   {!isUser && msg.text && (
-                    <div className="pt-3 border-t border-white/10 mt-3 flex items-center justify-between text-xs text-slate-400">
-                      <div className="flex items-center gap-2">
+                    <div className="pt-3 border-t border-white/10 mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                      <div className="flex items-center gap-3">
                         <button
                           onClick={() => handleCopyText(msg.text, idx)}
-                          className="flex items-center gap-1 hover:text-emerald-400 transition-colors"
+                          className="flex items-center gap-1.5 text-slate-400 hover:text-emerald-400 transition-colors"
                           title="Copy response"
                         >
-                          {copiedIndex === idx ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span className="text-[11px]">{copiedIndex === idx ? 'Copied' : 'Copy'}</span>
+                          {copiedIndex === idx ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          <span className="text-[11px]">{copiedIndex === idx ? 'Copied!' : 'Copy'}</span>
                         </button>
 
                         <button
                           onClick={() => handleSpeakText(msg.text, idx)}
-                          className="flex items-center gap-1 hover:text-emerald-400 transition-colors"
+                          className="flex items-center gap-1.5 text-slate-400 hover:text-emerald-400 transition-colors"
                           title="Read aloud"
                         >
                           {isSpeaking && speakingIndex === idx ? (
-                            <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                            <VolumeX className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
                           ) : (
                             <Volume2 className="w-3.5 h-3.5" />
                           )}
-                          <span className="text-[11px]">{isSpeaking && speakingIndex === idx ? 'Stop' : 'Listen'}</span>
+                          <span className="text-[11px]">
+                            {isSpeaking && speakingIndex === idx ? 'Stop Voice' : 'Listen'}
+                          </span>
                         </button>
                       </div>
 
                       {onSaveReflectionNote && (
                         <button
                           onClick={() => onSaveReflectionNote(msg.text)}
-                          className="flex items-center gap-1 text-amber-400 hover:underline transition-all"
+                          className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 font-medium transition-colors"
                         >
-                          <Heart className="w-3.5 h-3.5 text-rose-400" />
-                          <span className="text-[11px]">Save as Reflection</span>
+                          <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-500/20" />
+                          <span className="text-[11px]">Save to Daily Reflections</span>
                         </button>
                       )}
                     </div>
@@ -340,7 +501,7 @@ I am here to help you study the life, noble character, battles, treaties, and te
               </div>
 
               {isUser && (
-                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 text-amber-300 flex items-center justify-center shrink-0 text-xs font-bold shadow-xs mt-1">
+                <div className="w-9 h-9 rounded-2xl bg-white/10 border border-white/10 text-amber-300 flex items-center justify-center shrink-0 text-xs font-bold shadow-xs mt-1">
                   You
                 </div>
               )}
@@ -350,12 +511,12 @@ I am here to help you study the life, noble character, battles, treaties, and te
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Prompts Grid */}
-      {messages.length <= 2 && (
-        <div className="p-3 bg-slate-950/60 backdrop-blur-xl border-t border-white/10">
-          <p className="text-[11px] font-bold text-slate-400 mb-2 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>Suggested Questions:</span>
+      {/* Suggested Prompts Pill Grid */}
+      {messages.length <= 3 && (
+        <div className="p-3 bg-slate-950/80 backdrop-blur-xl border-t border-white/10">
+          <p className="text-[11px] font-bold text-slate-400 mb-2 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Suggested Seerah Topics:</span>
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {SUGGESTED_PROMPTS.map((prompt, i) => (
@@ -363,7 +524,7 @@ I am here to help you study the life, noble character, battles, treaties, and te
                 key={i}
                 onClick={() => handleSendMessage(prompt)}
                 disabled={isStreaming}
-                className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs whitespace-nowrap hover:border-emerald-500/40 hover:text-emerald-400 transition-all shrink-0 backdrop-blur-md"
+                className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 text-slate-300 hover:text-emerald-300 text-xs whitespace-nowrap hover:border-emerald-500/40 transition-all shrink-0 backdrop-blur-md"
               >
                 {prompt}
               </button>
@@ -372,8 +533,8 @@ I am here to help you study the life, noble character, battles, treaties, and te
         </div>
       )}
 
-      {/* Input Box */}
-      <div className="p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xl border-t border-white/10">
+      {/* Input Form */}
+      <div className="p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xl border-t border-white/10">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -385,7 +546,7 @@ I am here to help you study the life, noble character, battles, treaties, and te
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Ask anything about Seerah, Hadith, or classical events..."
+            placeholder="Ask anything about Seerah, Hadith, Battles, or Prophetic character..."
             disabled={isStreaming}
             className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-500/50 backdrop-blur-md transition-all"
           />
@@ -393,9 +554,14 @@ I am here to help you study the life, noble character, battles, treaties, and te
           <button
             type="submit"
             disabled={!inputText.trim() || isStreaming}
-            className="p-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center justify-center shrink-0"
+            className="p-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center shrink-0"
+            title="Send Query"
           >
-            {isStreaming ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            {isStreaming ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </button>
         </form>
       </div>
