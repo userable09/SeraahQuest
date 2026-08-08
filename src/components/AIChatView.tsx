@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { 
   Bot, 
   Send, 
@@ -8,14 +10,10 @@ import {
   Copy, 
   Check, 
   Sparkles, 
-  BookOpen, 
   Heart, 
   RefreshCw,
   Cpu,
-  Quote,
-  MessageSquare,
-  Bookmark,
-  Share2
+  Quote
 } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { getStoredChatHistory, saveChatHistory } from '../lib/storage';
@@ -33,119 +31,70 @@ const SUGGESTED_PROMPTS = [
   "What lessons can we learn from the Prophet's ﷺ Farewell Sermon?"
 ];
 
-// Helper component to render rich, structured Markdown responses
+// Helper component to render rich, structured Markdown responses using react-markdown
 const FormattedResponse: React.FC<{ text: string; isStreaming?: boolean }> = ({ text, isStreaming }) => {
   if (!text) return null;
 
-  // Split text into blocks (paragraphs, headers, quotes, lists)
-  const blocks = text.split('\n\n');
-
-  const renderInlineText = (raw: string) => {
-    // Process bold (**text**) and italic (*text*)
-    const parts = raw.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
-    return parts.map((part, idx) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={idx} className="font-bold text-amber-300">{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith('*') && part.endsWith('*')) {
-        return <em key={idx} className="italic text-emerald-200">{part.slice(1, -1)}</em>;
-      }
-      if (part.startsWith('`') && part.endsWith('`')) {
-        return <code key={idx} className="px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 font-mono text-xs border border-emerald-500/30">{part.slice(1, -1)}</code>;
-      }
-      // Check for Arabic characters
-      const containsArabic = /[\u0600-\u06FF]/.test(part);
-      if (containsArabic) {
-        return <span key={idx} className="font-arabic text-emerald-300 text-base font-medium px-1">{part}</span>;
-      }
-      return part;
-    });
-  };
-
   return (
-    <div className="space-y-3 font-sans text-xs sm:text-sm text-slate-100 leading-relaxed">
-      {blocks.map((block, bIdx) => {
-        const trimmed = block.trim();
-
-        // Headers
-        if (trimmed.startsWith('### ')) {
-          return (
-            <h3 key={bIdx} className="text-sm sm:text-base font-bold text-amber-400 pt-2 pb-1 border-b border-amber-500/20 flex items-center gap-2">
+    <div className="space-y-3 font-sans text-xs sm:text-sm text-slate-100 leading-relaxed max-w-none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h3: ({ children }) => (
+            <h3 className="text-sm sm:text-base font-bold text-amber-300 pt-3 pb-1 border-b border-amber-500/20 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>{renderInlineText(trimmed.replace('### ', ''))}</span>
+              <span>{children}</span>
             </h3>
-          );
-        }
-
-        if (trimmed.startsWith('#### ')) {
-          return (
-            <h4 key={bIdx} className="text-xs sm:text-sm font-bold text-emerald-300 pt-1 flex items-center gap-1.5">
+          ),
+          h4: ({ children }) => (
+            <h4 className="text-xs sm:text-sm font-bold text-emerald-300 pt-2 flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span>{renderInlineText(trimmed.replace('#### ', ''))}</span>
+              <span>{children}</span>
             </h4>
-          );
-        }
-
-        // Blockquotes (e.g. Verses or Hadiths)
-        if (trimmed.startsWith('>')) {
-          const quoteText = trimmed.replace(/^>\s*/gm, '');
-          return (
-            <div key={bIdx} className="my-3 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 to-slate-900/60 border-l-4 border-amber-400 text-slate-200 shadow-xs relative">
+          ),
+          p: ({ children }) => (
+            <p className="leading-relaxed text-slate-200 my-1.5">
+              {children}
+            </p>
+          ),
+          blockquote: ({ children }) => (
+            <div className="my-3 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 to-slate-900/80 border-l-4 border-amber-400 text-amber-100 shadow-sm relative">
               <Quote className="w-4 h-4 text-amber-400/50 absolute top-2 right-2 pointer-events-none" />
-              <p className="italic font-serif leading-relaxed text-xs sm:text-sm">
-                {renderInlineText(quoteText)}
-              </p>
+              <div className="italic font-serif leading-relaxed text-xs sm:text-sm">
+                {children}
+              </div>
             </div>
-          );
-        }
-
-        // Bulleted lists
-        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-          const items = trimmed.split('\n');
-          return (
-            <ul key={bIdx} className="space-y-1.5 my-2 pl-1">
-              {items.map((item, iIdx) => {
-                const cleanItem = item.replace(/^[-*]\s*/, '');
-                return (
-                  <li key={iIdx} className="flex items-start gap-2 text-slate-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0" />
-                    <span className="flex-1">{renderInlineText(cleanItem)}</span>
-                  </li>
-                );
-              })}
+          ),
+          ul: ({ children }) => (
+            <ul className="space-y-1.5 my-2.5 pl-2">
+              {children}
             </ul>
-          );
-        }
-
-        // Numbered lists
-        if (/^\d+\.\s/.test(trimmed)) {
-          const items = trimmed.split('\n');
-          return (
-            <ol key={bIdx} className="space-y-2 my-2 pl-1">
-              {items.map((item, iIdx) => {
-                const match = item.match(/^(\d+)\.\s*(.*)/);
-                const num = match ? match[1] : (iIdx + 1).toString();
-                const cleanItem = match ? match[2] : item;
-                return (
-                  <li key={iIdx} className="flex items-start gap-2.5 text-slate-200">
-                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30 shrink-0 mt-0.5">
-                      {num}
-                    </span>
-                    <span className="flex-1 leading-relaxed">{renderInlineText(cleanItem)}</span>
-                  </li>
-                );
-              })}
+          ),
+          ol: ({ children }) => (
+            <ol className="space-y-2 my-2.5 pl-2 list-decimal list-inside text-amber-300 font-semibold">
+              {children}
             </ol>
-          );
-        }
-
-        // Standard Paragraph
-        return (
-          <p key={bIdx} className="leading-relaxed">
-            {renderInlineText(trimmed)}
-          </p>
-        );
-      })}
+          ),
+          li: ({ children }) => (
+            <li className="text-slate-200 font-normal leading-relaxed">
+              {children}
+            </li>
+          ),
+          strong: ({ children }) => (
+            <strong className="font-bold text-amber-300">{children}</strong>
+          ),
+          em: ({ children }) => (
+            <em className="italic text-emerald-200">{children}</em>
+          ),
+          code: ({ children }) => (
+            <code className="px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 font-mono text-xs border border-emerald-500/30">
+              {children}
+            </code>
+          )
+        }}
+      >
+        {text}
+      </ReactMarkdown>
 
       {/* Streaming cursor */}
       {isStreaming && (
@@ -248,18 +197,22 @@ I draw upon classical biography texts (*Ar-Raheeq Al-Makhtum*, *Sirat Ibn Hisham
       const decoder = new TextDecoder();
       let accumulatedText = '';
       let detectedModel = 'Seerah AI Scholar';
+      let buffer = '';
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          // Keep the incomplete last line in the buffer
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.replace('data: ', '').trim();
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const dataStr = trimmed.replace('data: ', '').trim();
               if (dataStr === '[DONE]') break;
 
               try {
@@ -279,11 +232,21 @@ I draw upon classical biography texts (*Ar-Raheeq Al-Makhtum*, *Sirat Ibn Hisham
                   )
                 );
               } catch (e) {
-                // Raw text fallback
-                if (dataStr && !dataStr.startsWith('{')) {
-                  accumulatedText += dataStr;
-                }
+                // Ignore parsing errors for incomplete lines
               }
+            }
+          }
+        }
+
+        // Process any remaining buffered text
+        if (buffer.trim().startsWith('data: ')) {
+          const dataStr = buffer.trim().replace('data: ', '').trim();
+          if (dataStr !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.text) accumulatedText += parsed.text;
+            } catch (e) {
+              // ignore
             }
           }
         }
